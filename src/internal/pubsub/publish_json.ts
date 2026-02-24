@@ -5,5 +5,5 @@ export async function publishJSON<T>(
   value: T,
 ): Promise<void> {
   const content = Buffer.from(JSON.stringify(value));
-  await ch.publish(exchange, routingKey, content, {contentType: "application/json"});
+  return await ch.publish(exchange, routingKey, content, {contentType: "application/json"});
 }
