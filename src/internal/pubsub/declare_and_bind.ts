@@ -18,7 +18,7 @@ export async function declareAndBind(
   const autoDelete = queueType === SimpleQueueType.Transient;
   const exclusive = queueType === SimpleQueueType.Transient;
 
-  const queue = await ch.assertQueue(queueName, {durable, autoDelete, exclusive});
+  const queue = await ch.assertQueue(queueName, {durable, autoDelete, exclusive, arguments: {"x-dead-letter-exchange": "peril_dlx"}});
   await ch.bindQueue(queueName, exchange, key);
   
   return [ch, queue];
