@@ -1,14 +1,14 @@
 import amqp from "amqplib";
 
-import { clientWelcome, printClientHelp, getInput, commandStatus, printQuit } from "../internal/gamelogic/gamelogic";
+import { clientWelcome, printClientHelp, getInput, commandStatus, printQuit, getMaliciousLog } from "../internal/gamelogic/gamelogic";
 import { declareAndBind, SimpleQueueType } from "../internal/pubsub/declare_and_bind";
 import { subscribeJSON } from "../internal/pubsub/subscribe_json";
-import { publishJSON } from "../internal/pubsub/publish_json";
-import { ExchangePerilDirect, ExchangePerilTopic, PauseKey, ArmyMovesPrefix } from "../internal/routing/routing";
+import { publishJSON, publishMsgPack } from "../internal/pubsub/publish_json";
+import { ExchangePerilDirect, ExchangePerilTopic, PauseKey, ArmyMovesPrefix, WarRecognitionsPrefix, GameLogSlug } from "../internal/routing/routing";
 import { GameState } from "../internal/gamelogic/gamestate";
 import { commandSpawn } from "../internal/gamelogic/spawn";
 import { commandMove } from "../internal/gamelogic/move";
-import { handlerPause, handlerMove } from "./handlers";
+import { handlerPause, handlerMove, handlerWar } from "./handlers";
 
 async function main() {
   console.log("Starting Peril client...");
@@ -40,8 +40,17 @@ async function main() {
 		      `${ArmyMovesPrefix}.${username}`,
 		      `${ArmyMovesPrefix}.*`,
 		      SimpleQueueType.Transient,
-		      handlerMove(gameState),
+		      handlerMove(cch, gameState),
 		     );
+  
+  await subscribeJSON(conn,
+		      ExchangePerilTopic,
+		      WarRecognitionsPrefix,
+		      `${WarRecognitionsPrefix}.*`,
+		      SimpleQueueType.Durable,
+		      handlerWar(cch, gameState),
+		     );
+    
 
   while (true) {
     const words = await getInput();
@@ -85,6 +94,28 @@ async function main() {
 
     if (firstWord === "help") {
       printClientHelp();
+      continue;
+    }
+
+    if (firstWord === "spam") {
+      if (words.length != 2 || Number.isNaN(Number(words[1]))) {
+	console.log("spam command requires an additional amount argument.");
+	continue;
+      }
+      
+      const n = Number(words[1]);
+      for (let i = 0; i < n; i++) {
+	const maliciousLog = getMaliciousLog();
+	await publishMsgPack(cch,
+			  ExchangePerilTopic,
+			  `${GameLogSlug}.${username}`,
+			     {
+			    message: maliciousLog,
+			    currentTime: Date.now(),
+			  },
+			 );
+      }
+      
       continue;
     }
 
